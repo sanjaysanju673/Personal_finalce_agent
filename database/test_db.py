@@ -1,11 +1,9 @@
-from collectors.stock_list import (
-    get_nifty500
+from collectors.technicals import (
+    calculate_indicators
 )
 
-df = get_nifty500()
-
-print(df.head())
-
-print(
-    f"Total Stocks: {len(df)}"
+result = calculate_indicators(
+    "TCS"
 )
+
+print(result)

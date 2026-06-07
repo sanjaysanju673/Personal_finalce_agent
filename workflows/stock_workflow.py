@@ -11,21 +11,19 @@ from agents.technical_agent import TechnicalAgent
 from agents.news_agent import NewsAgent
 from agents.scoring_agent import ScoringAgent
 from agents.report_agent import ReportAgent
-from database.repository import (
-    save_stock_data
-)
 
 from tools.telegram_tool import send, send_file
 from tools.pdf_tool import text_to_pdf
 
 logger = get_logger(__name__)
 
-TOP_N = 10
+TOP_N = 20
+FINAL_N = 5
 
 
 def collect_stock_data(symbol, company_name):
-    """Step 1 & 2: Collect fundamentals, technicals, and news data"""
-    logger.info(f"[COLLECT] Fetching data for {symbol}")
+    """Collect fundamentals and technicals for a stock."""
+    logger.info(f"[COLLECT] Fetching fundamentals and technicals for {symbol}")
     try:
         logger.debug(f"  → Fetching fundamentals for {symbol}")
         fundamentals = fetch_fundamentals(symbol)
@@ -39,20 +37,53 @@ def collect_stock_data(symbol, company_name):
             logger.warning(f"  ✗ No technical data for {symbol}")
             return None
 
-        logger.debug(f"  → Fetching news for {symbol}")
-        news_articles = get_company_news(company_name)
-        logger.debug(f"  ✓ Got {len(news_articles)} news articles for {symbol}")
-
         return {
             "symbol": symbol,
             "company_name": company_name,
             "fundamentals": fundamentals,
             "technicals": technicals,
-            "news_articles": news_articles
+            "news_articles": []
         }
 
     except Exception as e:
         logger.error(f"  ✗ Error collecting data for {symbol}: {e}", exc_info=True)
+        return None
+
+
+def collect_fundamentals(symbol, company_name):
+    """Collect fundamental data for one stock."""
+    logger.info(f"[COLLECT] Fetching fundamentals for {symbol}")
+    try:
+        fundamentals = fetch_fundamentals(symbol)
+        if not fundamentals:
+            logger.warning(f"  ✗ No fundamental data for {symbol}")
+            return None
+
+        return {
+            "symbol": symbol,
+            "company_name": company_name,
+            "fundamentals": fundamentals
+        }
+    except Exception as e:
+        logger.error(f"  ✗ Error collecting fundamentals for {symbol}: {e}", exc_info=True)
+        return None
+
+
+def collect_technicals(stock):
+    """Collect technical data for one stock after fundamentals are available."""
+    symbol = stock["symbol"]
+    logger.info(f"[COLLECT] Fetching technicals for {symbol}")
+    try:
+        technicals = calculate_indicators(symbol)
+        if not technicals:
+            logger.warning(f"  ✗ No technical data for {symbol}")
+            return None
+
+        stock["technicals"] = technicals
+        stock["news_articles"] = []
+        return stock
+    except Exception as e:
+        logger.error(f"  ✗ Error collecting technicals for {symbol}: {e}", exc_info=True)
         return None
 
 
@@ -94,33 +125,36 @@ def calculate_fast_scores(data):
         return None
 
 
-def calculate_news_and_final_score(stock):
-    """Add LLM-based news analysis and recalculate final score"""
-    logger.info(f"[LLM SCORE] Adding news analysis for {stock['symbol']}")
+def calculate_news_and_final_score(stock, use_api: bool = False):
+    """Add news analysis for a stock and recalculate final score.
+
+    If `use_api` is False, use the local heuristic to avoid API calls.
+    """
+    logger.info(f"[NEWS SCORE] Adding news analysis for {stock['symbol']}")
     try:
         symbol = stock["symbol"]
-        
         headlines = [item["title"] for item in stock["news_articles"]]
-        logger.debug(f"  → Running LLM news analysis for {symbol}")
+        logger.debug(f"  → Running news analysis for {symbol} (use_api={use_api})")
         news_agent = NewsAgent()
-        news_result = news_agent.analyze(headlines)
+        news_result = news_agent.analyze(headlines, use_api=use_api)
         logger.info(f"  ✓ News score: {news_result['news_score']}")
 
-        logger.debug(f"  → Recalculating final score with LLM news")
+        logger.debug(f"  → Recalculating final score with news score")
         scoring_agent = ScoringAgent()
         final_score = scoring_agent.calculate(
             stock["fundamental_score"],
             stock["technical_score"],
             news_result["news_score"]
         )
-        logger.info(f"  ✓ Final score with LLM: {final_score}")
+        logger.info(f"  ✓ Final score with news: {final_score}")
 
         stock["final_score"] = final_score
         stock["news"] = news_result
         return stock
 
     except Exception as e:
-        logger.error(f"  ✗ Error calculating LLM score for {stock['symbol']}: {e}", exc_info=True)
+        logger.error(f"  ✗ Error calculating news score for {stock['symbol']}: {e}", exc_info=True)
+        stock["news"] = {"sentiment": "Neutral", "news_score": 50}
         return stock
 
 
@@ -144,7 +178,7 @@ def build_daily_report(top_stocks):
                 final_score=stock["final_score"],
                 fundamentals=stock["fundamentals"],
                 technicals=stock["technicals"],
-                sentiment=stock["news"]["sentiment"]
+                news=stock.get("news", {}).get("sentiment", "Neutral")
             )
 
             report.append(f"\n{'─'*50}")
@@ -165,15 +199,15 @@ def build_daily_report(top_stocks):
 
 def run_workflow():
     """
-    Main workflow orchestrator following the exact process flow:
+    Main workflow orchestrator following the new process flow:
     1. NIFTY500 - Fetch stock list
-    2. Collect Data - Gather fundamentals, technicals, news
-    3. Store SQLite - Save data to database
-    4. Calculate Scores - Analyze and score each stock
-    5. Rank Stocks - Sort by final score
-    6. Top 10 - Select top performers
-    7. LLM Analysis - Generate comprehensive reports
-    8. Telegram - Send results to telegram
+    2. Collect Fundamentals
+    3. Collect Technicals
+    4. Score
+    5. Top 20
+    6. News Analysis
+    7. Top 5 LLM Report
+    8. Telegram
     """
     logger.info("=" * 60)
     logger.info("[WORKFLOW START] Daily Stock Analysis Pipeline at 8 AM")
@@ -187,115 +221,118 @@ def run_workflow():
         stock_df = get_nifty500()
         logger.info(f"✓ Fetched {len(stock_df)} stocks from NIFTY500")
         
-        # Limit to first 2200 for testing (can increase later)
-        stock_df = stock_df.head(2200)
+        # Limit to first 100 for testing (can increase later)
+        stock_df = stock_df.head(500)
         logger.info(f"✓ Processing first {len(stock_df)} stocks")
         
-        # STEP 2 & 3: Collect Data and Store SQLite
-        logger.info("\n[STEP 2/8] COLLECT DATA - Gathering fundamentals, technicals, news")
-        logger.info("[STEP 3/8] STORE SQLITE - Saving collected data to database")
-        
-        collected_data = []
-        stored_count = 0
-        
+        # STEP 2: Collect Fundamentals
+        logger.info("\n[STEP 2/8] COLLECT FUNDAMENTALS - Gathering fundamentals for each stock")
+        fundamentals_list = []
         for idx, (_, row) in enumerate(stock_df.iterrows(), 1):
             symbol = row["Symbol"]
             company = row["Company Name"]
-            
-            # Collect data for each stock
-            data = collect_stock_data(symbol, company)
-            if data:
-                collected_data.append(data)
-                
-                # Store immediately to database
-                logger.debug(f"  → Storing {symbol} in SQLite")
-                try:
-                    save_stock_data({
-                        "symbol": symbol,
-                        "company_name": company,
-                        "fundamentals": data["fundamentals"],
-                        "technicals": data["technicals"],
-                        "news": {"sentiment": "neutral"},
-                        "final_score": 0,
-                        "fundamental_reasons": [],
-                        "technical_reasons": []
-                    })
-                    stored_count += 1
-                except Exception as e:
-                    logger.error(f"  ✗ Failed to store {symbol}: {e}")
-            
-            # Progress update
-            if idx % 5 == 0:
-                logger.info(f"  Progress: {idx}/{len(stock_df)} stocks processed")
-        
-        logger.info(f"✓ Data collection complete: {len(collected_data)} stocks collected, {stored_count} stored in SQLite")
-        
-        if not collected_data:
-            logger.warning("⚠ No stocks processed successfully. Exiting.")
-            logger.info("[WORKFLOW FAILED] No data collected")
+            fundamentals = collect_fundamentals(symbol, company)
+            if fundamentals:
+                fundamentals_list.append(fundamentals)
+
+            if idx % 10 == 0:
+                logger.info(f"  Progress: {idx}/{len(stock_df)} fundamentals collected")
+
+        logger.info(f"✓ Fundamentals collected for {len(fundamentals_list)} stocks")
+
+        if not fundamentals_list:
+            logger.warning("⚠ No fundamentals collected successfully. Exiting.")
+            logger.info("[WORKFLOW FAILED] No fundamentals data")
             return
-        
-        # STEP 4: Calculate Scores (FAST - No LLM)
-        logger.info("\n[STEP 4/8] CALCULATE SCORES - Computing fundamental + technical scores (fast)")
-        
+
+        # STEP 3: Collect Technicals
+        logger.info("\n[STEP 3/8] COLLECT TECHNICALS - Gathering technical indicators for stocks")
+        collected_data = []
+        for idx, stock in enumerate(fundamentals_list, 1):
+            result = collect_technicals(stock)
+            if result:
+                collected_data.append(result)
+
+            if idx % 10 == 0:
+                logger.info(f"  Progress: {idx}/{len(fundamentals_list)} technicals collected")
+
+        logger.info(f"✓ Technicals collected for {len(collected_data)} stocks")
+
+        if not collected_data:
+            logger.warning("⚠ No technicals collected successfully. Exiting.")
+            logger.info("[WORKFLOW FAILED] No technical data")
+            return
+
+        # STEP 4: Score
+        logger.info("\n[STEP 4/8] SCORE - Calculating scores from fundamentals and technicals")
         scored_stocks = []
         for idx, data in enumerate(collected_data, 1):
             score_result = calculate_fast_scores(data)
             if score_result:
                 scored_stocks.append(score_result)
             if idx % 10 == 0:
-                logger.info(f"  Progress: {idx}/{len(collected_data)} stocks fast-scored")
-        
-        logger.info(f"✓ Fast score calculation complete: {len(scored_stocks)} stocks scored")
-        
+                logger.info(f"  Progress: {idx}/{len(collected_data)} stocks scored")
+
+        logger.info(f"✓ Score calculation complete: {len(scored_stocks)} stocks scored")
+
         if not scored_stocks:
             logger.warning("⚠ No stocks scored successfully. Exiting.")
             logger.info("[WORKFLOW FAILED] No scores calculated")
             return
-        
-        # STEP 5: Rank Stocks
-        logger.info("\n[STEP 5/8] RANK STOCKS - Sorting by fundamental + technical score")
-        
+
+        # STEP 5: Top 20
+        logger.info("\n[STEP 5/8] TOP 20 - Selecting top stocks from score list")
         ranked_stocks = sorted(
             scored_stocks,
             key=lambda x: x["final_score"],
             reverse=True
         )
-        
-        logger.info(f"✓ Ranking complete. Top 5 stocks (before LLM):")
-        for idx, stock in enumerate(ranked_stocks[:5], 1):
-            logger.info(f"  #{idx}. {stock['symbol']}: Score {stock['final_score']:.2f}")
-        
-        # STEP 6: Top 10
-        logger.info(f"\n[STEP 6/8] TOP 10 - Selecting top {TOP_N} performers for LLM analysis")
-        
         top_stocks = ranked_stocks[:TOP_N]
-        logger.info(f"✓ Selected top {len(top_stocks)} stocks for LLM-based news analysis")
-        
+        logger.info(f"✓ Selected top {len(top_stocks)} stocks for news analysis")
         for idx, stock in enumerate(top_stocks, 1):
-            logger.info(f"  {idx}. {stock['symbol']} - {stock['company_name']}")
-        
-        # STEP 6B: LLM News Analysis for Top Stocks Only
-        logger.info(f"\n[STEP 6B/8] LLM NEWS ANALYSIS - Adding LLM analysis to top {len(top_stocks)} stocks")
-        
+            logger.info(f"  #{idx}. {stock['symbol']}: Score {stock['final_score']:.2f}")
+
+        # STEP 6: News Analysis
+        logger.info("\n[STEP 6/8] NEWS ANALYSIS - Collecting news and scoring top stocks")
         for idx, stock in enumerate(top_stocks, 1):
-            top_stocks[idx-1] = calculate_news_and_final_score(stock)
-        
-        # Re-rank after adding LLM scores
+            logger.info(f"  → Fetching news for {stock['symbol']}")
+            stock["news_articles"] = get_company_news(stock["company_name"])
+            logger.info(f"  ✓ Fetched {len(stock['news_articles'])} news articles for {stock['symbol']}")
+            # Use heuristic analysis for the initial pass to avoid API calls
+            top_stocks[idx-1] = calculate_news_and_final_score(stock, use_api=False)
+
+        # Re-rank after news scoring
         top_stocks = sorted(
             top_stocks,
             key=lambda x: x["final_score"],
             reverse=True
         )
-        
-        logger.info(f"✓ LLM analysis complete. Updated top {len(top_stocks)} stocks with LLM scores:")
-        for idx, stock in enumerate(top_stocks, 1):
-            logger.info(f"  #{idx}. {stock['symbol']}: Final Score {stock['final_score']:.2f}")
-        
-        # STEP 7: LLM Analysis (Report Generation)
-        logger.info(f"\n[STEP 7/8] LLM ANALYSIS - Generating detailed reports")
-        
-        final_report = build_daily_report(top_stocks)
+        logger.info("✓ News analysis complete and top stocks re-ranked")
+        for idx, stock in enumerate(top_stocks[:FINAL_N], 1):
+            logger.info(f"  #{idx}. {stock['symbol']}: Score {stock['final_score']:.2f}")
+
+        # STEP 7: Top 5 LLM Report
+        logger.info(f"\n[STEP 7/8] TOP 5 - Selecting top {FINAL_N} stocks for LLM report")
+        report_stocks = top_stocks[:FINAL_N]
+        for idx, stock in enumerate(report_stocks, 1):
+            logger.info(f"  {idx}. {stock['symbol']} - {stock['company_name']}")
+
+        # Re-run news analysis using the API only for the final top-N to save calls
+        logger.info("\n[OPTIMIZE] Re-running API-based news analysis for final top stocks")
+        for idx, stock in enumerate(report_stocks, 1):
+            logger.info(f"  → API news analysis for {stock['symbol']}")
+            # fetch fresh articles if needed
+            if not stock.get("news_articles"):
+                stock["news_articles"] = get_company_news(stock["company_name"])
+
+            # overwrite with API analysis
+            report_stocks[idx-1] = calculate_news_and_final_score(stock, use_api=True)
+
+        # Re-sort final report stocks by updated final_score
+        report_stocks = sorted(report_stocks, key=lambda x: x["final_score"], reverse=True)
+
+        logger.info(f"\n[STEP 8/8] LLM REPORT - Generating PDF report for top {FINAL_N} stocks")
+        final_report = build_daily_report(report_stocks)
         
         # STEP 8: Telegram
         logger.info(f"\n[STEP 8/8] TELEGRAM - Sending report to Telegram")

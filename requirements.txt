@@ -1,6 +1,5 @@
 langchain
 langgraph
-langchain-ollama
 
 pandas
 numpy
@@ -18,7 +17,7 @@ sqlalchemy
 pandas-ta
 
 yfinance
-
+groq
 feedparser
 
 python-telegram-bot

@@ -1,72 +1,102 @@
-from langchain_ollama import ChatOllama
+import json
 
-from config.settings import (
-    OLLAMA_MODEL
-)
+from ollama import chat
+
 from config.logging_config import get_logger
+from config.settings import LOCAL_OLLAMA_MODEL
 
 logger = get_logger(__name__)
+
 
 class NewsAgent:
 
     def __init__(self):
-        logger.info(f"Initializing NewsAgent with model: {OLLAMA_MODEL}")
-        self.llm = ChatOllama(
-            model=OLLAMA_MODEL,
-            temperature=0
-        )
 
-    def analyze(self, headlines):
-        logger.debug(f"Analyzing {len(headlines) if headlines else 0} headlines")
+        self.model = LOCAL_OLLAMA_MODEL
 
-        if not headlines:
-            logger.warning("No headlines provided, returning neutral score")
-            return {
-                "news_score": 50,
-                "sentiment": "Neutral"
-            }
+    def analyze(
+        self,
+        articles,
+        use_api: bool = True
+    ):
 
-        text = "\n".join(headlines)
+        try:
 
-        prompt = f"""
-Analyze the news.
+            if not articles:
 
-Headlines:
+                return {
+                    "sentiment": "Neutral",
+                    "news_score": 50
+                }
 
-{text}
+            headlines = "\n".join(
+                [article.get("title", "") for article in articles[:10]]
+                if isinstance(articles[0], dict)
+                else [str(article) for article in articles[:10]]
+            )
 
-Return:
+            if not use_api:
+                pos_words = ["gain", "rise", "up", "beat", "positive", "upgrade", "surge", "record"]
+                neg_words = ["fall", "drop", "down", "miss", "negative", "downgrade", "decline", "loss"]
+                text = headlines.lower()
+                pos_count = sum(text.count(w) for w in pos_words)
+                neg_count = sum(text.count(w) for w in neg_words)
+                diff = pos_count - neg_count
+                score = max(0, min(100, 50 + diff * 10))
+                sentiment = (
+                    "Positive" if score >= 66 else
+                    "Negative" if score <= 34 else
+                    "Neutral"
+                )
+                logger.info(f"News sentiment (heuristic): {sentiment}, score: {score}")
+                return {"sentiment": sentiment, "news_score": score}
 
-Positive
-Neutral
-Negative
+            prompt =prompt = f"""
+You must respond ONLY with JSON.
 
-and score from 0 to 100.
+Example:
 
-Format:
+{{
+  "sentiment":"Positive",
+  "score":80
+}}
 
-Sentiment:
-Score:
+News Headlines:
+
+{headlines}
 """
+            response = chat(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
 
-        result = self.llm.invoke(prompt)
+            content = response["message"]["content"]
 
-        content = result.content
+            try:
+                result = json.loads(content)
+                sentiment = result.get("sentiment", "Neutral")
+                score = result.get("score", 50)
+                logger.info(f"News sentiment (local Ollama): {sentiment}, score: {score}")
+                return {"sentiment": sentiment, "news_score": score}
+            except Exception:
+                logger.warning("JSON parse failed; falling back to heuristic")
+                return self.analyze(articles, use_api=False)
 
-        score = 50
+        except Exception as e:
 
-        sentiment = "Neutral"
+            logger.exception(
+                f"News analysis failed: {e}"
+            )
 
-        if "Positive" in content:
-            sentiment = "Positive"
-            score = 90
+            return {
 
-        elif "Negative" in content:
-            sentiment = "Negative"
-            score = 20
+                "sentiment": "Neutral",
 
-        return {
-            "sentiment": sentiment,
-            "news_score": score,
-            "raw_response": content
-        }
+                "news_score": 50
+
+            }

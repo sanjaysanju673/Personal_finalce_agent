@@ -1,57 +1,77 @@
-import requests
-from bs4 import BeautifulSoup
+import yfinance as yf
+
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def get_screener_url(symbol):
-
-    return f"https://www.screener.in/company/{symbol}/"
-
 
 def fetch_fundamentals(symbol):
-    logger.debug(f"Fetching fundamentals for {symbol}")
+
     try:
 
-        url = get_screener_url(symbol)
-        logger.debug(f"Fetching from URL: {url}")
-
-        response = requests.get(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            },
-            timeout=10
+        ticker = yf.Ticker(
+            f"{symbol}.NS"
         )
 
-        logger.debug(f"Response status code for {symbol}: {response.status_code}")
+        info = ticker.info
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
+        roe = info.get(
+            "returnOnEquity",
+            0
         )
 
-        # Return with default values when data parsing fails
-        logger.info(f"Successfully fetched fundamentals for {symbol}")
+        debt_equity = info.get(
+            "debtToEquity",
+            0
+        )
+
+        profit_margin = info.get(
+            "profitMargins",
+            0
+        )
+
+        market_cap = info.get(
+            "marketCap",
+            0
+        )
+
+        if roe:
+            roe = roe * 100
+
+        if profit_margin:
+            profit_margin = profit_margin * 100
+
         return {
+
             "symbol": symbol,
-            "roe": 0,
+
+            "roe": round(
+                roe,
+                2
+            ),
+
             "roce": 0,
-            "debt_equity": 0,
+
+            "debt_equity": round(
+                debt_equity,
+                2
+            ),
+
             "sales_growth": 0,
-            "profit_growth": 0
+
+            "profit_growth": round(
+                profit_margin,
+                2
+            ),
+
+            "market_cap": market_cap
+
         }
 
     except Exception as e:
 
-        logger.warning(f"Could not fetch fundamentals for {symbol}: {str(e)}")
+        logger.error(
+            f"Fundamental fetch failed for {symbol}: {e}"
+        )
 
-        # Return default values instead of None
-        return {
-            "symbol": symbol,
-            "roe": 0,
-            "roce": 0,
-            "debt_equity": 0,
-            "sales_growth": 0,
-            "profit_growth": 0
-        }
+        return None

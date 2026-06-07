@@ -1,6 +1,6 @@
 # Finance Agent V1-V3
 
-LangGraph + LangChain + SQLite + Ollama + Telegram stock research agent.
+LangGraph + LangChain + SQLite + Groq + Telegram stock research agent.
 
 Features:
 - Fundamental screening

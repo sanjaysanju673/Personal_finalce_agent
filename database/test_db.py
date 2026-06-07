@@ -1,30 +1,20 @@
-import sqlite3
+from groq import Groq
+from config.settings import GROQ_API_KEY, GROQ_MODEL, GROQ_BASE_URL
 
-conn = sqlite3.connect(
-    "database/stock.db"
+client_args = {}
+if GROQ_API_KEY:
+    client_args["api_key"] = GROQ_API_KEY
+if GROQ_BASE_URL:
+    client_args["base_url"] = GROQ_BASE_URL
+
+client = Groq(**client_args) if client_args else Groq()
+
+response = client.chat.completions.create(
+    messages=[
+        {"role": "user", "content": "Say hello"}
+    ],
+    model=GROQ_MODEL,
 )
 
-cursor = conn.cursor()
-
-cursor.execute(
-    "SELECT name FROM sqlite_master WHERE type='table';"
-)
-
-tables = cursor.fetchall()
-
-for table in tables:
-
-    table_name = table[0]
-
-    print(f"\n===== {table_name} =====")
-
-    cursor.execute(
-        f"SELECT * FROM {table_name}"
-    )
-
-    rows = cursor.fetchall()
-
-    for row in rows:
-        print(row)
-
-conn.close()
+print(response.choices[0].message.content)
+PermissionError

@@ -3,12 +3,14 @@ from langchain_ollama import ChatOllama
 from config.settings import (
     OLLAMA_MODEL
 )
+from config.logging_config import get_logger
 
+logger = get_logger(__name__)
 
 class ReportAgent:
 
     def __init__(self):
-
+        logger.info(f"Initializing ReportAgent with model: {OLLAMA_MODEL}")
         self.llm = ChatOllama(
             model=OLLAMA_MODEL,
             temperature=0
@@ -22,6 +24,7 @@ class ReportAgent:
         technicals,
         sentiment
     ):
+        logger.debug(f"Generating report for {symbol}")
 
         prompt = f"""
 You are a stock analyst.

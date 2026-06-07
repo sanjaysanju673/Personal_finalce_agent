@@ -9,6 +9,8 @@ requests
 
 python-dotenv
 
+APScheduler
+
 schedule
 
 sqlalchemy
@@ -19,4 +21,7 @@ yfinance
 
 feedparser
 
-python-telegram-botS
+python-telegram-bot
+beautifulsoup4
+fpdf
+reportlab

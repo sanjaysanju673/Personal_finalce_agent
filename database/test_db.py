@@ -1,9 +1,30 @@
-from collectors.technicals import (
-    calculate_indicators
+import sqlite3
+
+conn = sqlite3.connect(
+    "database/stock.db"
 )
 
-result = calculate_indicators(
-    "TCS"
+cursor = conn.cursor()
+
+cursor.execute(
+    "SELECT name FROM sqlite_master WHERE type='table';"
 )
 
-print(result)
+tables = cursor.fetchall()
+
+for table in tables:
+
+    table_name = table[0]
+
+    print(f"\n===== {table_name} =====")
+
+    cursor.execute(
+        f"SELECT * FROM {table_name}"
+    )
+
+    rows = cursor.fetchall()
+
+    for row in rows:
+        print(row)
+
+conn.close()

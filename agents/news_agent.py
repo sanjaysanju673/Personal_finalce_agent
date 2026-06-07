@@ -3,21 +3,24 @@ from langchain_ollama import ChatOllama
 from config.settings import (
     OLLAMA_MODEL
 )
+from config.logging_config import get_logger
 
+logger = get_logger(__name__)
 
 class NewsAgent:
 
     def __init__(self):
-
+        logger.info(f"Initializing NewsAgent with model: {OLLAMA_MODEL}")
         self.llm = ChatOllama(
             model=OLLAMA_MODEL,
             temperature=0
         )
 
     def analyze(self, headlines):
+        logger.debug(f"Analyzing {len(headlines) if headlines else 0} headlines")
 
         if not headlines:
-
+            logger.warning("No headlines provided, returning neutral score")
             return {
                 "news_score": 50,
                 "sentiment": "Neutral"

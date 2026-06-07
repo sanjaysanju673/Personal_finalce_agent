@@ -42,18 +42,14 @@ class ReportAgent:
     ):
 
         try:
-            prompt = f"""
+            prompt = prompt = f"""
 You are a Senior Equity Research Analyst.
 
-Create a professional stock research report suitable for a PDF investment report.
+Create a concise professional stock research report.
 
-STOCK INFORMATION
+Stock Symbol: {symbol}
 
-Stock Symbol:
-{symbol}
-
-Overall Score:
-{final_score}/100
+Overall Score: {final_score}/100
 
 Fundamental Metrics:
 {fundamentals}
@@ -64,69 +60,48 @@ Technical Indicators:
 News Analysis:
 {news}
 
-REPORT REQUIREMENTS:
+Instructions:
 
-* Use clear section headings.
-* Use bullet points where appropriate.
-* Keep language professional and concise.
-* Do not exceed 250 words.
-* Do not use markdown code blocks.
-* Avoid repeating raw data values unnecessarily.
-* Focus on investment insights.
+* Use plain text only.
+* Do not use boxes, separators, lines, stars, markdown, emojis or ASCII art.
+* Use the exact section titles below.
+* Keep the report between 150 and 250 words.
+* Write in professional investment research style.
+* Focus on actionable insights.
 
-OUTPUT FORMAT:
+Format:
 
-==================================================
-STOCK RESEARCH REPORT
-=====================
+Executive Summary
 
-EXECUTIVE SUMMARY
+Investment Rating
+Recommendation:
+Confidence:
 
-* Provide a 2-3 sentence summary.
+Key Strengths
 
-INVESTMENT RATING
+* Point 1
+* Point 2
+* Point 3
 
-* BUY / WATCH / AVOID
-* Confidence Level: LOW / MEDIUM / HIGH
+Key Risks
 
-KEY STRENGTHS
-• Strength 1
-• Strength 2
-• Strength 3
+* Point 1
+* Point 2
+* Point 3
 
-KEY RISKS
-• Risk 1
-• Risk 2
-• Risk 3
+Fundamental Analysis
 
-FUNDAMENTAL ANALYSIS
-• Revenue Growth Assessment
-• Profitability Assessment
-• Financial Health Assessment
+Technical Analysis
 
-TECHNICAL ANALYSIS
-• Trend Direction
-• Momentum Analysis
-• Support / Resistance Outlook
+News Impact Analysis
 
-NEWS IMPACT ANALYSIS
-• Sentiment Assessment
-• Major Positive Factors
-• Major Negative Factors
+Short-Term Outlook
 
-SHORT-TERM OUTLOOK (1-3 Months)
-• Expected stock behavior
-• Key catalysts
+Long-Term Outlook
 
-LONG-TERM OUTLOOK (1-3 Years)
-• Growth potential
-• Business outlook
+Final Verdict
 
-FINAL VERDICT
-• One clear recommendation.
-• One sentence justification.
-
-Generate the report now.
+Generate only the report.
 """
 
 

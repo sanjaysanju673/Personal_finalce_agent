@@ -222,7 +222,7 @@ def run_workflow():
         logger.info(f"✓ Fetched {len(stock_df)} stocks from NIFTY500")
         
         # Limit to first 100 for testing (can increase later)
-        stock_df = stock_df.head(500)
+        stock_df = stock_df.head(3)
         logger.info(f"✓ Processing first {len(stock_df)} stocks")
         
         # STEP 2: Collect Fundamentals

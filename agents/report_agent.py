@@ -42,35 +42,93 @@ class ReportAgent:
     ):
 
         try:
-
             prompt = f"""
-You are a professional stock market analyst.
+You are a Senior Equity Research Analyst.
 
-Analyze the following stock. and generate a concise report covering the following aspects:
+Create a professional stock research report suitable for a PDF investment report.
 
-Stock: {symbol}
+STOCK INFORMATION
 
-Final Score:
-{final_score}
-Fundamentals:
+Stock Symbol:
+{symbol}
+
+Overall Score:
+{final_score}/100
+
+Fundamental Metrics:
 {fundamentals}
 
-Technicals:
+Technical Indicators:
 {technicals}
 
-News Sentiment:
+News Analysis:
 {news}
 
-Generate:
+REPORT REQUIREMENTS:
 
-1. Investment Summary
-2. Key Strengths
-3. Key Risks
-4. Short-Term Outlook
-5. Long-Term Outlook
+* Use clear section headings.
+* Use bullet points where appropriate.
+* Keep language professional and concise.
+* Do not exceed 250 words.
+* Do not use markdown code blocks.
+* Avoid repeating raw data values unnecessarily.
+* Focus on investment insights.
 
-Keep response under 300 words.
+OUTPUT FORMAT:
+
+==================================================
+STOCK RESEARCH REPORT
+=====================
+
+EXECUTIVE SUMMARY
+
+* Provide a 2-3 sentence summary.
+
+INVESTMENT RATING
+
+* BUY / WATCH / AVOID
+* Confidence Level: LOW / MEDIUM / HIGH
+
+KEY STRENGTHS
+• Strength 1
+• Strength 2
+• Strength 3
+
+KEY RISKS
+• Risk 1
+• Risk 2
+• Risk 3
+
+FUNDAMENTAL ANALYSIS
+• Revenue Growth Assessment
+• Profitability Assessment
+• Financial Health Assessment
+
+TECHNICAL ANALYSIS
+• Trend Direction
+• Momentum Analysis
+• Support / Resistance Outlook
+
+NEWS IMPACT ANALYSIS
+• Sentiment Assessment
+• Major Positive Factors
+• Major Negative Factors
+
+SHORT-TERM OUTLOOK (1-3 Months)
+• Expected stock behavior
+• Key catalysts
+
+LONG-TERM OUTLOOK (1-3 Years)
+• Growth potential
+• Business outlook
+
+FINAL VERDICT
+• One clear recommendation.
+• One sentence justification.
+
+Generate the report now.
 """
+
 
             response = self.client.chat.completions.create(
                 messages=[

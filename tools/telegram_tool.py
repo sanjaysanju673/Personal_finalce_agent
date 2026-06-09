@@ -54,7 +54,7 @@ def send_file(file_path, caption=None):
     )
 
     data = {
-        "chat_id": TELEGRAM_CHAT_ID
+        "chat_id": TELEGRAM_CHAT_ID , 
     }
 
     if caption:

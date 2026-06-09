@@ -12,85 +12,122 @@ class FundamentalAgent:
         )
 
         score = 0
-
         reasons = []
 
-        roe = data.get("roe") or 0
+        roe = data.get(
+            "roe", 0
+        )
 
-        profit_margin = data.get(
-            "profit_growth"
-        ) or 0
+        revenue_growth = data.get(
+            "revenue_growth", 0
+        )
 
-        debt = data.get(
-            "debt_equity"
-        ) or 999
+        profit_growth = data.get(
+            "profit_growth", 0
+        )
 
-        market_cap = data.get(
-            "market_cap"
-        ) or 0
+        debt_equity = data.get(
+            "debt_equity", 999
+        )
 
-        # ROE
-        if roe >= 15:
+        eps_growth = data.get(
+            "eps_growth", 0
+        )
 
-            score += 35
+        current_ratio = data.get(
+            "current_ratio", 0
+        )
 
+        # ROE (20)
+
+        if roe >= 20:
+            score += 20
             reasons.append(
-                f"Strong ROE ({roe:.2f}%)"
+                f"Excellent ROE ({roe:.2f}%)"
             )
 
-            logger.info(
-                f"ROE check passed: {roe}%"
-            )
-
-        # Profit Margin
-        if profit_margin >= 10:
-
-            score += 25
-
-            reasons.append(
-                f"Healthy Profit Margin ({profit_margin:.2f}%)"
-            )
-
-            logger.info(
-                f"Profit Margin check passed: {profit_margin}%"
-            )
-
-        # Debt
-        if debt <= 1:
-
-            score += 25
-
-            reasons.append(
-                f"Low Debt ({debt})"
-            )
-
-            logger.info(
-                f"Debt check passed: {debt}"
-            )
-
-        # Market Cap
-        if market_cap >= 100_000_000_000:
-
+        elif roe >= 15:
             score += 15
-
             reasons.append(
-                "Large Cap Company"
+                f"Good ROE ({roe:.2f}%)"
             )
 
-            logger.info(
-                f"Market Cap check passed: {market_cap}"
+        # Revenue Growth (20)
+
+        if revenue_growth >= 15:
+            score += 20
+            reasons.append(
+                f"Strong Revenue Growth ({revenue_growth:.2f}%)"
+            )
+
+        elif revenue_growth >= 8:
+            score += 10
+            reasons.append(
+                f"Moderate Revenue Growth ({revenue_growth:.2f}%)"
+            )
+
+        # Profit Growth (20)
+
+        if profit_growth >= 15:
+            score += 20
+            reasons.append(
+                f"Strong Profit Growth ({profit_growth:.2f}%)"
+            )
+
+        elif profit_growth >= 8:
+            score += 10
+            reasons.append(
+                f"Moderate Profit Growth ({profit_growth:.2f}%)"
+            )
+
+        # Debt Equity (15)
+
+        if debt_equity <= 0.5:
+            score += 15
+            reasons.append(
+                f"Very Low Debt ({debt_equity})"
+            )
+
+        elif debt_equity <= 1:
+            score += 10
+            reasons.append(
+                f"Manageable Debt ({debt_equity})"
+            )
+
+        # EPS Growth (15)
+
+        if eps_growth >= 15:
+            score += 15
+            reasons.append(
+                f"Strong EPS Growth ({eps_growth:.2f}%)"
+            )
+
+        elif eps_growth >= 5:
+            score += 8
+            reasons.append(
+                f"Positive EPS Growth ({eps_growth:.2f}%)"
+            )
+
+        # Current Ratio (10)
+
+        if current_ratio >= 2:
+            score += 10
+            reasons.append(
+                f"Strong Liquidity ({current_ratio:.2f})"
+            )
+
+        elif current_ratio >= 1:
+            score += 5
+            reasons.append(
+                f"Adequate Liquidity ({current_ratio:.2f})"
             )
 
         logger.info(
             f"Fundamental analysis complete - "
-            f"Score: {score}, "
-            f"Reasons: {reasons}"
+            f"Score: {score}"
         )
 
         return {
-
             "fundamental_score": score,
-
             "reasons": reasons
-
         }

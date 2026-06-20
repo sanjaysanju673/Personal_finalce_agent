@@ -9,14 +9,14 @@ class ScoringAgentTests(unittest.TestCase):
 
         score = agent.preliminary_score(80, 70)
 
-        self.assertEqual(score, 75.0)
+        self.assertEqual(score, 77.0)
 
-    def test_calculate_accepts_three_arguments_for_preliminary_pass(self):
+    def test_calculate_accepts_report_and_risk_inputs(self):
         agent = ScoringAgent()
 
-        score = agent.calculate(80, 70, 0)
+        score = agent.calculate(80, 70, 10, 20, 30)
 
-        self.assertEqual(score, 46.0)
+        self.assertEqual(score, 42.5)
 
 
 if __name__ == "__main__":

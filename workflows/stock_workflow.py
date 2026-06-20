@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from config.logging_config import get_logger
 
@@ -5,6 +6,7 @@ from collectors.stock_list import get_nifty500
 from collectors.fundamentals import fetch_fundamentals
 from collectors.technicals import calculate_indicators
 from collectors.news import get_company_news
+from collectors.download_reports import CompanyReportAgent as DownloadedReportAgent
 
 from agents.fundamental_agent import FundamentalAgent
 from agents.technical_agent import TechnicalAgent
@@ -12,7 +14,7 @@ from agents.news_agent import NewsAgent
 from agents.risk_agent import RiskAgent
 from agents.scoring_agent import ScoringAgent
 from agents.report_agent import ReportAgent
-from agents.company_report_agent import CompanyReportAgent
+from agents.company_report_agent import CompanyReportAgent as FundamentalReportAgent
 
 from tools.telegram_tool import send, send_file
 from tools.pdf_tool import text_to_pdf
@@ -130,6 +132,32 @@ def calculate_fast_scores(data):
         return None
 
 
+def load_report_score(stock):
+    """Download report data when needed and use it for the final report score."""
+    symbol = stock["symbol"]
+    reports_dir = os.path.join("reports", symbol)
+
+    try:
+        if not os.path.exists(reports_dir):
+            logger.info(f"  → Downloading report data for {symbol} because the local folder is missing")
+            DownloadedReportAgent().download(symbol, stock.get("fundamentals", {}))
+
+        if os.path.exists(reports_dir):
+            downloaded = DownloadedReportAgent().analyze(symbol)
+            stock["report_score"] = downloaded.get("report_score", 0)
+            stock["report_reasons"] = downloaded.get("reasons", [])
+            logger.info(f"  ✓ Loaded downloaded report score for {symbol}: {stock['report_score']}")
+            return stock
+    except Exception as exc:
+        logger.warning(f"  ⚠ Failed to read downloaded report data for {symbol}: {exc}")
+
+    fallback = FundamentalReportAgent().analyze(stock.get("fundamentals", {}))
+    stock["report_score"] = fallback.get("report_score", 0)
+    stock["report_reasons"] = fallback.get("reasons", [])
+    logger.info(f"  → Using fallback report score for {symbol}: {stock['report_score']}")
+    return stock
+
+
 def calculate_news_and_final_score(stock, use_api: bool = False):
     """Add news and risk analysis, then recalculate the final score."""
     logger.info(f"[NEWS + RISK] Analyzing {stock['symbol']}")
@@ -170,10 +198,8 @@ def calculate_news_and_final_score(stock, use_api: bool = False):
 }
         risk_result = risk_agent.analyze(risk_input)
         logger.info(f"  ✓ Risk score: {risk_result['risk_score']}")
-        company_report_agent = CompanyReportAgent()
-        report_result = company_report_agent.analyze(stock["fundamentals"])
-        stock["report_score"] = report_result["report_score"]
-        stock["report_reasons"] = report_result["reasons"]
+
+        stock = load_report_score(stock)
         scoring_agent = ScoringAgent()
         final_score = final_score = scoring_agent.calculate(
     stock["fundamental_score"],
@@ -260,6 +286,8 @@ def run_workflow():
     12. Top 5 LLM Reports
     13. Telegram PDF
     """
+    import os
+
     logger.info("=" * 60)
     logger.info("[WORKFLOW START] Daily Stock Analysis Pipeline at 8 AM")
     logger.info("=" * 60)
@@ -268,7 +296,7 @@ def run_workflow():
     
     try:
         # STEP 1: NIFTY500 - Fetch stock list
-        logger.info("\n[STEP 1/8] NIFTY500 - Fetching stock list")
+        logger.info("\n[STEP 1/13] NIFTY500 - Fetching stock list")
         stock_df = get_nifty500()
         logger.info(f"✓ Fetched {len(stock_df)} stocks from NIFTY500")
         
@@ -277,7 +305,7 @@ def run_workflow():
         logger.info(f"✓ Processing first {len(stock_df)} stocks")
         
         # STEP 2: Collect Fundamentals
-        logger.info("\n[STEP 2/8] COLLECT FUNDAMENTALS - Gathering fundamentals for each stock")
+        logger.info("\n[STEP 2/13] COLLECT FUNDAMENTALS - Gathering fundamentals for each stock")
         fundamentals_list = []
         for idx, (_, row) in enumerate(stock_df.iterrows(), 1):
             symbol = row["Symbol"]
@@ -297,7 +325,7 @@ def run_workflow():
             return
 
         # STEP 3: Collect Technicals
-        logger.info("\n[STEP 3/8] COLLECT TECHNICALS - Gathering technical indicators for stocks")
+        logger.info("\n[STEP 3/13] COLLECT TECHNICALS - Gathering technical indicators for stocks")
         collected_data = []
         for idx, stock in enumerate(fundamentals_list, 1):
             result = collect_technicals(stock)
@@ -315,7 +343,7 @@ def run_workflow():
             return
 
         # STEP 4: Score
-        logger.info("\n[STEP 4/8] SCORE - Calculating scores from fundamentals and technicals")
+        logger.info("\n[STEP 4/13] SCORE - Calculating preliminary scores from fundamentals and technicals")
         scored_stocks = []
         for idx, data in enumerate(collected_data, 1):
             score_result = calculate_fast_scores(data)
@@ -344,7 +372,13 @@ def run_workflow():
             logger.info(f"  #{idx}. {stock['symbol']}: Preliminary Score {stock['preliminary_score']:.2f}")
 
         # STEP 6: Top 50
-        logger.info("\n[STEP 6/13] TOP 50 - Gathering news and risk data for shortlisted stocks")
+        logger.info("\n[STEP 6/13] TOP 50 - Shortlisting the best 50 stocks for deeper analysis")
+
+        logger.info("\n[STEP 7/13] DOWNLOAD REPORTS - Downloading or loading report data for the shortlisted stocks")
+        for stock in top_50:
+            load_report_score(stock)
+
+        logger.info("\n[STEP 8/13] NEWS + RISK - Gathering news and risk data for shortlisted stocks")
         final_candidates = []
         for idx, stock in enumerate(top_50, 1):
             logger.info(f"  → Fetching news for {stock['symbol']}")
@@ -353,7 +387,7 @@ def run_workflow():
             final_candidates.append(calculate_news_and_final_score(stock, use_api=False))
 
         # STEP 7: News Analysis + Risk Analysis
-        logger.info("\n[STEP 7/13] NEWS ANALYSIS + RISK ANALYSIS - Refining the shortlist")
+        logger.info("\n[STEP 9/13] NEWS ANALYSIS + RISK ANALYSIS - Refining the shortlist")
         final_ranked = sorted(
             final_candidates,
             key=lambda x: x["final_score"],
@@ -365,13 +399,13 @@ def run_workflow():
             logger.info(f"  #{idx}. {stock['symbol']}: Final Score {stock['final_score']:.2f}")
 
         # STEP 8: Final Score
-        logger.info("\n[STEP 8/13] FINAL SCORE - Confirming the top 20 final ranking")
+        logger.info("\n[STEP 10/13] FINAL SCORE - Confirming the top 20 final ranking")
 
         # STEP 9: Top 20
-        logger.info(f"\n[STEP 9/13] TOP 20 - Keeping the best {len(top_20)} stocks for report generation")
+        logger.info(f"\n[STEP 11/13] TOP 20 - Keeping the best {len(top_20)} stocks for report generation")
 
         # STEP 10: Top 5 LLM Reports
-        logger.info(f"\n[STEP 10/13] TOP 5 LLM REPORTS - Preparing the best {REPORT_TOP_N} names for deeper analysis")
+        logger.info(f"\n[STEP 12/13] TOP 5 LLM REPORTS - Preparing the best {REPORT_TOP_N} names for deeper analysis")
         report_stocks = top_20[:REPORT_TOP_N]
         for idx, stock in enumerate(report_stocks, 1):
             logger.info(f"  {idx}. {stock['symbol']} - {stock['company_name']}")
@@ -385,11 +419,11 @@ def run_workflow():
 
         report_stocks = sorted(report_stocks, key=lambda x: x["final_score"], reverse=True)
 
-        logger.info(f"\n[STEP 11/13] TELEGRAM PDF - Generating PDF report for top {REPORT_TOP_N} stocks")
+        logger.info(f"\n[STEP 13/13] TELEGRAM PDF - Generating PDF report for top {REPORT_TOP_N} stocks")
         final_report = build_daily_report(report_stocks)
         
-        # STEP 12: Telegram PDF
-        logger.info("\n[STEP 12/13] TELEGRAM PDF - Sending report to Telegram")
+        # STEP 13: Telegram PDF
+        logger.info("\n[STEP 13/13] TELEGRAM PDF - Sending report to Telegram")
         
         try:
             # Create reports directory

@@ -17,6 +17,28 @@ class ScoringAgent:
             2
         )
 
+    def dynamic_trade_score(
+        self,
+        momentum_score,
+        relative_strength_score,
+        volume_score,
+        setup_score,
+        market_regime_score,
+        catalyst_score,
+        risk_score
+    ):
+        """Compute the live trading score using the project’s weighted rules."""
+        trade_score = (
+            0.25 * momentum_score +
+            0.20 * relative_strength_score +
+            0.15 * volume_score +
+            0.15 * setup_score +
+            0.10 * market_regime_score +
+            0.10 * catalyst_score +
+            0.05 * risk_score
+        )
+        return round(trade_score, 2)
+
     def calculate(
         self,
         fundamental_score,
@@ -27,7 +49,7 @@ class ScoringAgent:
     ):
 
         logger.debug(
-            f"Calculating final score - "
+            f"Calculating dynamic trade score - "
             f"Fundamental: {fundamental_score}, "
             f"Technical: {technical_score}, "
             f"News: {news_score}, "
@@ -35,21 +57,25 @@ class ScoringAgent:
             f"Risk: {risk_score}"
         )
 
-        final_score = (
-            fundamental_score * 0.25 +
-            technical_score * 0.15 +
-            news_score * 0.15 +
-            report_score * 0.30 +
-            risk_score * 0.15
-        )
+        momentum_score = max(0, min(100, float(technical_score)))
+        relative_strength_score = max(0, min(100, float(fundamental_score)))
+        volume_score = max(0, min(100, ((float(technical_score) + float(news_score)) / 2.0)))
+        setup_score = max(0, min(100, float(technical_score)))
+        market_regime_score = max(0, min(100, ((float(technical_score) + float(news_score) + float(risk_score)) / 3.0)))
+        catalyst_score = max(0, min(100, float(news_score)))
 
-        final_score = round(
-            final_score,
-            2
+        trade_score = self.dynamic_trade_score(
+            momentum_score=momentum_score,
+            relative_strength_score=relative_strength_score,
+            volume_score=volume_score,
+            setup_score=setup_score,
+            market_regime_score=market_regime_score,
+            catalyst_score=catalyst_score,
+            risk_score=max(0, min(100, float(risk_score)))
         )
 
         logger.info(
-            f"Final score calculated: {final_score}"
+            f"Dynamic trade score calculated: {trade_score}"
         )
 
-        return final_score
+        return trade_score

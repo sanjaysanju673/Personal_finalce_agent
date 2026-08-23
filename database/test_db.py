@@ -1,20 +1,25 @@
+import unittest
+
 from groq import Groq
+
 from config.settings import GROQ_API_KEY, GROQ_MODEL, GROQ_BASE_URL
 
-client_args = {}
-if GROQ_API_KEY:
-    client_args["api_key"] = GROQ_API_KEY
-if GROQ_BASE_URL:
-    client_args["base_url"] = GROQ_BASE_URL
 
-client = Groq(**client_args) if client_args else Groq()
+@unittest.skipUnless(GROQ_API_KEY, "GROQ_API_KEY is not set")
+class GroqConnectivityTests(unittest.TestCase):
+    def test_chat_completions_returns_response(self):
+        client_args = {"api_key": GROQ_API_KEY}
+        if GROQ_BASE_URL:
+            client_args["base_url"] = GROQ_BASE_URL
 
-response = client.chat.completions.create(
-    messages=[
-        {"role": "user", "content": "Say hello"}
-    ],
-    model=GROQ_MODEL,
-)
+        client = Groq(**client_args)
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": "Say hello"}],
+            model=GROQ_MODEL,
+        )
 
-print(response.choices[0].message.content)
-PermissionError
+        self.assertIn("hello", response.choices[0].message.content.lower())
+
+
+if __name__ == "__main__":
+    unittest.main()

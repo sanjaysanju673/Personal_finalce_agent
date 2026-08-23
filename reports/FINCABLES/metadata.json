@@ -1,0 +1,22 @@
+{
+  "tables": {
+    "table_0": {
+      "column_names": [
+        "Compounded Sales Growth"
+      ],
+      "preview": "Compounded Sales Growth"
+    },
+    "table_1": {
+      "column_names": [
+        "Compounded Profit Growth"
+      ],
+      "preview": "Compounded Profit Growth"
+    },
+    "table_2": {
+      "column_names": [
+        "Operating Profit"
+      ],
+      "preview": "Operating Profit Margin"
+    }
+  }
+}

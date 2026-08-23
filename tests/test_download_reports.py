@@ -41,7 +41,39 @@ class DownloadReportsTests(unittest.TestCase):
 
                 result = CompanyReportAgent().analyze('TEST_STOCK')
 
-                self.assertGreaterEqual(result['report_score'], 0)
+                self.assertEqual(result['report_score'], 70)
+                self.assertIsInstance(result['reasons'], list)
+            finally:
+                if symbol_dir.exists():
+                    shutil.rmtree(symbol_dir)
+
+    def test_analyze_handles_reports_without_metadata_file(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = Path(__file__).resolve().parents[1]
+            reports_dir = repo_root / 'reports'
+            symbol_dir = reports_dir / 'TEST_STOCK_NO_METADATA'
+
+            try:
+                if symbol_dir.exists():
+                    shutil.rmtree(symbol_dir)
+
+                symbol_dir.mkdir(parents=True, exist_ok=True)
+                (symbol_dir / 'sales_growth.csv').write_text(
+                    'Metric,Value\nSales Growth,11%\n',
+                    encoding='utf-8'
+                )
+                (symbol_dir / 'profit_growth.csv').write_text(
+                    'Metric,Value\nProfit Growth,13%\n',
+                    encoding='utf-8'
+                )
+                (symbol_dir / 'quarterly.csv').write_text(
+                    'Metric,Latest\nOperating Margin,27%\n',
+                    encoding='utf-8'
+                )
+
+                result = CompanyReportAgent().analyze('TEST_STOCK_NO_METADATA')
+
+                self.assertEqual(result['report_score'], 70)
                 self.assertIsInstance(result['reasons'], list)
             finally:
                 if symbol_dir.exists():

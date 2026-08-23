@@ -1,56 +1,132 @@
-from config.constants import (
-    MIN_ROE,
-    MIN_PROFIT_GROWTH,
-    MIN_SALES_GROWTH,
-    MAX_DEBT_EQUITY
-)
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 class FundamentalAgent:
 
     def analyze(self, data):
-        logger.debug(f"Analyzing fundamental data: {data}")
+
+        logger.debug(
+            f"Analyzing fundamental data: {data}"
+        )
 
         score = 0
-
         reasons = []
 
-        roe = data.get("roe") or 0
-        profit_growth = data.get("profit_growth") or 0
-        sales_growth = data.get("sales_growth") or 0
-        debt = data.get("debt_equity") or 999
+        roe = data.get(
+            "roe", 0
+        )
 
-        if isinstance(roe, (int, float)) and roe >= MIN_ROE:
-            score += 25
+        revenue_growth = data.get(
+            "revenue_growth", 0
+        )
+
+        profit_growth = data.get(
+            "profit_growth", 0
+        )
+
+        debt_equity = data.get(
+            "debt_equity", 999
+        )
+
+        eps_growth = data.get(
+            "eps_growth", 0
+        )
+
+        current_ratio = data.get(
+            "current_ratio", 0
+        )
+
+        # ROE (20)
+
+        if roe >= 20:
+            score += 20
             reasons.append(
-                f"ROE is healthy ({roe}%)"
+                f"Excellent ROE ({roe:.2f}%)"
             )
-            logger.info(f"ROE check passed: {roe}% >= {MIN_ROE}%")
 
-        if isinstance(profit_growth, (int, float)) and profit_growth >= MIN_PROFIT_GROWTH:
-            score += 25
+        elif roe >= 15:
+            score += 15
             reasons.append(
-                f"Profit growth strong ({profit_growth}%)"
+                f"Good ROE ({roe:.2f}%)"
             )
-            logger.info(f"Profit growth check passed: {profit_growth}% >= {MIN_PROFIT_GROWTH}%")
 
-        if isinstance(sales_growth, (int, float)) and sales_growth >= MIN_SALES_GROWTH:
-            score += 25
+        # Revenue Growth (20)
+
+        if revenue_growth >= 15:
+            score += 20
             reasons.append(
-                f"Sales growth healthy ({sales_growth}%)"
+                f"Strong Revenue Growth ({revenue_growth:.2f}%)"
             )
-            logger.info(f"Sales growth check passed: {sales_growth}% >= {MIN_SALES_GROWTH}%")
 
-        if isinstance(debt, (int, float)) and debt <= MAX_DEBT_EQUITY:
-            score += 25
+        elif revenue_growth >= 8:
+            score += 10
             reasons.append(
-                f"Low debt ({debt})"
+                f"Moderate Revenue Growth ({revenue_growth:.2f}%)"
             )
-            logger.info(f"Debt check passed: {debt} <= {MAX_DEBT_EQUITY}")
 
-        logger.info(f"Fundamental analysis complete - Score: {score}, Reasons: {reasons}")
+        # Profit Growth (20)
+
+        if profit_growth >= 15:
+            score += 20
+            reasons.append(
+                f"Strong Profit Growth ({profit_growth:.2f}%)"
+            )
+
+        elif profit_growth >= 8:
+            score += 10
+            reasons.append(
+                f"Moderate Profit Growth ({profit_growth:.2f}%)"
+            )
+
+        # Debt Equity (15)
+
+        if debt_equity <= 0.5:
+            score += 15
+            reasons.append(
+                f"Very Low Debt ({debt_equity})"
+            )
+
+        elif debt_equity <= 1:
+            score += 10
+            reasons.append(
+                f"Manageable Debt ({debt_equity})"
+            )
+
+        # EPS Growth (15)
+
+        if eps_growth >= 15:
+            score += 15
+            reasons.append(
+                f"Strong EPS Growth ({eps_growth:.2f}%)"
+            )
+
+        elif eps_growth >= 5:
+            score += 8
+            reasons.append(
+                f"Positive EPS Growth ({eps_growth:.2f}%)"
+            )
+
+        # Current Ratio (10)
+
+        if current_ratio >= 2:
+            score += 10
+            reasons.append(
+                f"Strong Liquidity ({current_ratio:.2f})"
+            )
+
+        elif current_ratio >= 1:
+            score += 5
+            reasons.append(
+                f"Adequate Liquidity ({current_ratio:.2f})"
+            )
+
+        logger.info(
+            f"Fundamental analysis complete - "
+            f"Score: {score}"
+        )
+
         return {
             "fundamental_score": score,
             "reasons": reasons

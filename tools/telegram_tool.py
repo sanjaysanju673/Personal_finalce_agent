@@ -2,14 +2,23 @@ import requests
 
 from config.settings import (
     TELEGRAM_BOT_TOKEN,
-    TELEGRAM_CHAT_ID
+    TELEGRAM_CHAT_ID,
 )
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
+def _has_telegram_config():
+    return bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+
+
 def send(message):
-    logger.debug(f"Preparing to send Telegram message")
+    logger.debug("Preparing to send Telegram message")
+
+    if not _has_telegram_config():
+        logger.warning("Telegram is not configured; skipping message send.")
+        return False
 
     url = (
         f"https://api.telegram.org/bot"
@@ -19,33 +28,26 @@ def send(message):
 
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
+        "text": message,
     }
 
     try:
-
-        response = requests.post(
-            url,
-            json=payload,
-            timeout=30
-        )
-
+        response = requests.post(url, json=payload, timeout=30)
         response.raise_for_status()
-
-        logger.info(
-            "Telegram message sent successfully."
-        )
-
+        logger.info("Telegram message sent successfully.")
+        return True
     except Exception as e:
-
-        logger.error(
-            f"Telegram Error: {e}", exc_info=True
-        )
+        logger.error(f"Telegram Error: {e}", exc_info=True)
+        return False
 
 
 def send_file(file_path, caption=None):
     """Send a file (document) to Telegram chat as an attachment."""
     logger.debug(f"Preparing to send file {file_path} to Telegram")
+
+    if not _has_telegram_config():
+        logger.warning("Telegram is not configured; skipping file send for %s.", file_path)
+        return False
 
     url = (
         f"https://api.telegram.org/bot"
@@ -53,25 +55,19 @@ def send_file(file_path, caption=None):
         f"/sendDocument"
     )
 
-    data = {
-        "chat_id": TELEGRAM_CHAT_ID
-    }
-
+    data = {"chat_id": TELEGRAM_CHAT_ID}
     if caption:
         data["caption"] = caption
 
     try:
         with open(file_path, "rb") as f:
             files = {"document": f}
-            response = requests.post(
-                url,
-                data=data,
-                files=files,
-                timeout=60
-            )
+            response = requests.post(url, data=data, files=files, timeout=60)
             response.raise_for_status()
 
         logger.info(f"Telegram file sent successfully: {file_path}")
+        return True
 
     except Exception as e:
         logger.error(f"Telegram file send error: {e}", exc_info=True)
+        return False

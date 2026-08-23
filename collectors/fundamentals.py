@@ -1,57 +1,142 @@
-import requests
-from bs4 import BeautifulSoup
+import yfinance as yf
+
 from config.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def get_screener_url(symbol):
-
-    return f"https://www.screener.in/company/{symbol}/"
-
 
 def fetch_fundamentals(symbol):
-    logger.debug(f"Fetching fundamentals for {symbol}")
+
     try:
 
-        url = get_screener_url(symbol)
-        logger.debug(f"Fetching from URL: {url}")
-
-        response = requests.get(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            },
-            timeout=10
+        ticker = yf.Ticker(
+            f"{symbol}.NS"
         )
 
-        logger.debug(f"Response status code for {symbol}: {response.status_code}")
+        info = ticker.info
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
+        roe = info.get(
+            "returnOnEquity",
+            0
         )
 
-        # Return with default values when data parsing fails
-        logger.info(f"Successfully fetched fundamentals for {symbol}")
+        debt_equity = info.get(
+            "debtToEquity",
+            0
+        )
+
+        profit_margin = info.get(
+            "profitMargins",
+            0
+        )
+
+        revenue_growth = info.get(
+            "revenueGrowth",
+            0
+        )
+
+        earnings_growth = info.get(
+            "earningsGrowth",
+            0
+        )
+
+        current_ratio = info.get(
+            "currentRatio",
+            0
+        )
+
+        market_cap = info.get(
+            "marketCap",
+            0
+        )
+
+        # Convert decimals to %
+
+        roe = round(
+            roe * 100,
+            2
+        ) if roe else 0
+
+        profit_margin = round(
+            profit_margin * 100,
+            2
+        ) if profit_margin else 0
+
+        revenue_growth = round(
+            revenue_growth * 100,
+            2
+        ) if revenue_growth else 0
+
+        earnings_growth = round(
+            earnings_growth * 100,
+            2
+        ) if earnings_growth else 0
+
+        # -------------------------
+        # Derived fields for
+        # ReportAgent compatibility
+        # -------------------------
+
+        debt_trend = (
+            "decreasing"
+            if debt_equity <= 1
+            else "increasing"
+        )
+
+        cash_flow = (
+            "strong"
+            if current_ratio >= 1.5
+            else "weak"
+        )
+
+        management_sentiment = (
+            "positive"
+            if (
+                revenue_growth >= 10 and
+                profit_margin >= 10
+            )
+            else "neutral"
+        )
+
         return {
+
             "symbol": symbol,
-            "roe": 0,
-            "roce": 0,
-            "debt_equity": 0,
-            "sales_growth": 0,
-            "profit_growth": 0
+
+            "roe": roe,
+
+            "debt_equity": round(
+                debt_equity,
+                2
+            ),
+
+            "profit_growth": profit_margin,
+
+            "revenue_growth": revenue_growth,
+
+            "eps_growth": earnings_growth,
+
+            "current_ratio": round(
+                current_ratio,
+                2
+            ),
+
+            "market_cap": market_cap,
+
+            # For Report Agent
+
+            "debt_trend": debt_trend,
+
+            "cash_flow": cash_flow,
+
+            "management_sentiment":
+                management_sentiment
+
         }
 
     except Exception as e:
 
-        logger.warning(f"Could not fetch fundamentals for {symbol}: {str(e)}")
+        logger.error(
+            f"Fundamental fetch failed for {symbol}: {e}"
+        )
 
-        # Return default values instead of None
-        return {
-            "symbol": symbol,
-            "roe": 0,
-            "roce": 0,
-            "debt_equity": 0,
-            "sales_growth": 0,
-            "profit_growth": 0
-        }
+        return None

@@ -1,30 +1,25 @@
-import sqlite3
+import unittest
 
-conn = sqlite3.connect(
-    "database/stock.db"
-)
+from groq import Groq
 
-cursor = conn.cursor()
+from config.settings import GROQ_API_KEY, GROQ_MODEL, GROQ_BASE_URL
 
-cursor.execute(
-    "SELECT name FROM sqlite_master WHERE type='table';"
-)
 
-tables = cursor.fetchall()
+@unittest.skipUnless(GROQ_API_KEY, "GROQ_API_KEY is not set")
+class GroqConnectivityTests(unittest.TestCase):
+    def test_chat_completions_returns_response(self):
+        client_args = {"api_key": GROQ_API_KEY}
+        if GROQ_BASE_URL:
+            client_args["base_url"] = GROQ_BASE_URL
 
-for table in tables:
+        client = Groq(**client_args)
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": "Say hello"}],
+            model=GROQ_MODEL,
+        )
 
-    table_name = table[0]
+        self.assertIn("hello", response.choices[0].message.content.lower())
 
-    print(f"\n===== {table_name} =====")
 
-    cursor.execute(
-        f"SELECT * FROM {table_name}"
-    )
-
-    rows = cursor.fetchall()
-
-    for row in rows:
-        print(row)
-
-conn.close()
+if __name__ == "__main__":
+    unittest.main()
